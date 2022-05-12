@@ -195,6 +195,8 @@ extern "C" NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STR
 
 	Init();
 
+	DriverLoop();
+
 	Log("[SmKernel]Driver entry completed!\n");
 
 	return STATUS_SUCCESS;
