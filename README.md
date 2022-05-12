@@ -7,11 +7,11 @@
 <p>This project is maded in my free time and i make this very fast so this probably has some bugs.</p>
 <p>The project is simpel, i just add a simple triggerbot, just for poc.</p>
 
-# Can VAC detect this cheat?
+# Can VAC detect this cheat ?
 <p>Problaly no, because vac don't have a kernel driver that's can detect this feautures.</p>
 <p>To make sure it's undetectable you can add obCallBacks to the usermode app, but I don't think it's necessary for such a weak anticheat.</p>
 
-# Can kernel anticheats detect this cheat
+# Can kernel anticheats detect this cheat ?
 <p>Yes, because I didn't build this driver with security as a priority.</p>
 <p>So a kernel anticheat can easily detect this</p>
 
