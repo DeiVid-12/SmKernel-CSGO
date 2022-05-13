@@ -107,57 +107,43 @@ NTSTATUS CMemory::GetPid(void) {
 }
 
 DWORD CMemory::GetModuleBasex64(PEPROCESS Process, UNICODE_STRING ModuleName) {
-	KAPC_STATE apc;
-	if (!Process || !gGamePid)
-		return 0;
+	PPEB pPeb = PsGetProcessPeb(proc);
 
-	memset(&apc, 0, sizeof(apc));
-	PROCESS_BASIC_INFORMATION pbi;
-	ULONG size = 0;
-	HANDLE proc = NULL;
-	OBJECT_ATTRIBUTES obj_attr;
-	CLIENT_ID cid;
-
-	cid.UniqueProcess = (HANDLE)gGamePid;
-	cid.UniqueThread = NULL;
-	InitializeObjectAttributes(&obj_attr, NULL, 0, NULL, NULL);
-	ZwOpenProcess(&proc, PROCESS_ALL_ACCESS, &obj_attr, &cid);
-
-	NTSTATUS ntStatus;
-
-	ntStatus = ZwQueryInformationProcess(proc, ProcessBasicInformation, &pbi, sizeof(PROCESS_BASIC_INFORMATION), &size);
-
-	if (!NT_SUCCESS(ntStatus))
-		return 0;
-
-	KeStackAttachProcess(Process, &apc);
-
-	PPEB_LDR_DATA ldr = pbi.PebBaseAddress->Ldr;
-
-	if (!ldr) {
-		KeUnstackDetachProcess(&apc);
-		return 0;
+	if (!pPeb) {
+		Log("[SmKernel]Error pPeb not found \n");
+		return 0; 
 	}
 
-	PVOID found = NULL;
-	LIST_ENTRY* head = ldr->InMemoryOrderModuleList.Flink;
-	LIST_ENTRY* node = head;
-	do {
-		PLDR_DATA_TABLE_ENTRY entry = CONTAINING_RECORD(node, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+	KAPC_STATE state;
 
-		if (RtlEqualUnicodeString(&entry->BaseDllName, &ModuleName, TRUE)) {
-			Log("\n[SmKernel]Found Entry: '%wZ'", &entry->BaseDllName);
-			found = entry->DllBase;
-			break;
+	KeStackAttachProcess(proc, &state);
+
+	PPEB_LDR_DATA pLdr = (PPEB_LDR_DATA)pPeb->Ldr;
+
+	if (!pLdr) {
+		DbgPrintEx(0, 0, "Error pLdr not found \n");
+		KeUnstackDetachProcess(&state);
+		return 0; // failed
+	}
+
+
+
+	// loop the linked list
+	for (PLIST_ENTRY list = (PLIST_ENTRY)pLdr->ModuleListLoadOrder.Flink;
+		list != &pLdr->ModuleListLoadOrder; list = (PLIST_ENTRY)list->Flink) {
+		PLDR_DATA_TABLE_ENTRY pEntry =
+			CONTAINING_RECORD(list, LDR_DATA_TABLE_ENTRY, InLoadOrderModuleList);
+		if (RtlCompareUnicodeString(&pEntry->BaseDllName, &module_name, TRUE) ==
+			0) {
+			ULONG64 baseAddr = (ULONG64)pEntry->DllBase;
+			KeUnstackDetachProcess(&state);
+			return baseAddr;
 		}
+	}
+	DbgPrintEx(0, 0, "Error exiting funcion nothing was found found \n");
+	KeUnstackDetachProcess(&state);
 
-		node = entry->InMemoryOrderLinks.Flink;
-	} while (head != node);
-
-	KeUnstackDetachProcess(&apc);
-	ZwClose(proc);
-
-	return (DWORD)found;
+	return 0;
 }
 
 NTSTATUS CMemory::GetImageBase(PEPROCESS Process) {
