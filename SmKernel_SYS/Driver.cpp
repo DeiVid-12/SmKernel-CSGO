@@ -1,23 +1,6 @@
 #include "CMemory.h"
 #include "Globals.h"
 
-NTSTATUS FindGamePid(void) {
-	NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-
-	ntStatus = CMemory::GetPid();
-	if (!NT_SUCCESS(ntStatus)) {
-		Log("[SmKernel]Get PID Failed : \n");
-		return ntStatus;
-	}
-	return ntStatus;
-}
-
-NTSTATUS FindGameBase(void) {
-	if (gGameProcess)
-		CMemory::GetImageBase(gGameProcess);
-
-	return STATUS_SUCCESS;
-}
 NTSTATUS Init(void)  {
 	NTSTATUS ntStatus = STATUS_SUCCESS;
 
@@ -135,8 +118,6 @@ NTSTATUS DriverLoop(void) {
 		}
 
 		while (!(PCHAR)SharedSection == NULL && strcmp((PCHAR)SharedSection, "getBase") == 0) {
-			Log("[SmKernel]getBase loop is running\n");
-
 			KeSetEvent(SharedEvent_dt, 0, FALSE);
 
 			LARGE_INTEGER Timeout;
@@ -148,14 +129,19 @@ NTSTATUS DriverLoop(void) {
 			GET_USERMODULE_IN_PROCESS* GetBase = (GET_USERMODULE_IN_PROCESS*)SharedSection;
 
 			NTSTATUS ntStatus = STATUS_SUCCESS;
+			PEPROCESS TargetProcess;
+			ntStatus = PsLookupProcessByProcessId((HANDLE)GetBase->pid, &TargetProcess);
+			if (!NT_SUCCESS(ntStatus)) {
+				Log("[SmKernel]PsLookupProcessByProcessId failed\n");
+			}
+			Log("[SmKernel]PsLookupProcessByProcessId Success!\n");
 
-			FindGamePid();
-			CMemory::GetGameHandle();
-			FindGameBase();
+			UNICODE_STRING DLLName;
+			RtlInitUnicodeString(&DLLName, L"client.dll");
+			GetBase->BaseAddress = CMemory::GetModuleBasex64(TargetProcess, DLLName);
 
-			GetBase->BaseAddress = gBaseAddress;
 
-			Log("[SmKernel]getbase->BaseAddress is : %p \n", getbase->BaseAddress);
+			Log("[SmKernel]GetBase->BaseAddress is : %p \n", GetBase->BaseAddress);
 
 			CSharedMemory::Read();
 
